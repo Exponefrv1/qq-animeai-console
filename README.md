@@ -2,7 +2,7 @@
 Lite console application for making requests to QQ anime ai.  
 There is no face hack and no crop for now.   
 Example result:  
-![Example](https://imgur.com/a/MCg8cyn)
+![Example](https://i.imgur.com/cXJaTq2.jpeg)
 
 ## Usage
 You need to have Node.js and NPM installed.  

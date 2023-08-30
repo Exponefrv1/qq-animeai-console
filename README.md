@@ -16,5 +16,5 @@ Usage example:
 
 ### ⚠️ Currently the Chinese server might throw 403 errors with DIFFERENT_DIMENSION_ME mode, note that it's default mode!
 
-## Author
+## Credits
 Original code of requests - https://github.com/lmcsu/qq-neural-anime-tg

@@ -2,6 +2,7 @@
 Lite console application for making requests to QQ anime ai.  
 There is no face hack and no crop for now.   
 Example result:  
+
 ![Example](https://i.imgur.com/cXJaTq2.jpeg)
 
 ## Usage

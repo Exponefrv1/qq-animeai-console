@@ -21,7 +21,6 @@
     "@types/node": "^18.14.2"
   },
   "scripts": {
-    "start": "ts-node ./index.ts",
-    "lint": "eslint ./*.ts"
+    "start": "ts-node ./index.ts --help"
   }
 }

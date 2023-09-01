@@ -1,11 +1,11 @@
 import path from 'path';
-import md5 from 'md5';
 import fs from 'fs/promises';
-
-import axios from 'axios';
-import asyncRetry from 'async-retry';
-import { HttpsProxyAgent } from 'https-proxy-agent';
 import { parse } from 'ts-command-line-args';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { SocksProxyAgent } from 'socks-proxy-agent';
+
+const fh = require('./faceHack.ts');
+const qq = require('./sendRequests.ts');
 
 interface ITransformArguments {
 	image: string;
@@ -13,7 +13,7 @@ interface ITransformArguments {
 	mode?: string;
 	proxy?: string;
 	help?: boolean;
-}
+};
 
 const args = parse<ITransformArguments>({
 		image: {type: String, alias: 'i', description: 'Source image file path (./ for cwd)'},
@@ -25,10 +25,7 @@ const args = parse<ITransformArguments>({
 	{helpArg: 'help'}
 );
 
-let httpsAgent: HttpsProxyAgent | undefined;
-const mode = args.mode || 'DIFFERENT_DIMENSION_ME';
-
-const makeObject = (image: Buffer) => {
+const makeObject = async (image: Buffer, mode: string) => {
 
 	let busiId = '';
 
@@ -48,144 +45,40 @@ const makeObject = (image: Buffer) => {
 	return obj;
 };
 
-const signV1 = (obj: Record<string, unknown>) => {
-	const str = JSON.stringify(obj);
-	let encoded = md5(
-		'https://h5.tu.qq.com' +
-		(str.length + (encodeURIComponent(str).match(/%[89ABab]/g)?.length || 0)) +
-		'HQ31X02e',
-	);
-	return encoded;
-};
-
-const checkResponse = (data: Record<string, unknown> | undefined) => {
-	if (!data) {
-		throw new Error('No data');
-	}
-	if (data.msg === 'VOLUMN_LIMIT') {
-		throw new Error('QQ rate limit caught');
-	}		
-	if ((data.msg as string || '').includes('polaris limit')) {
-		throw new Error('QQ rate limit caught (polaris limit)');
-	}		
-	if ((data.msg === 'IMG_ILLEGAL') ||
-		(data.msg as string || '').includes('image illegal')) {
-		throw new Error('Couldn\'t pass the censorship. Try another photo.');
-	}
-	if (data.code === 1001) {
-		throw new Error('Face not found. Try another photo.');
-	}
-	if (data.code === -2100) {
-		console.error('Invalid request', JSON.stringify(data));
-		throw new Error('Try another photo.');
-	}
-	if (data.code === 2119 || data.code === -2111) {
-		console.error('Blocked', JSON.stringify(data));
-		throw new Error('Blocked by qq. Change ip location.');
-	}
-	if (!data.extra) {
-		throw new Error('Got no data from QQ: ' + JSON.stringify(data));
-	}
-	return data;
-};
-
-const sendRequest = async (obj: Record<string, unknown>) => {
-	const sign = signV1(obj);
-	let url = '';
-	if (mode === 'DIFFERENT_DIMENSION_ME') {
-		url = 'https://ai.tu.qq.com/overseas/trpc.shadow_cv.ai_processor_cgi.AIProcessorCgi/Process';
-	}
-	if (mode === 'AI_PAINTING_ANIME') {
-		url = 'https://ai.tu.qq.com/trpc.shadow_cv.ai_processor_cgi.AIProcessorCgi/Process';
-	}
-	let data;
-	try {
-		data = await asyncRetry(
-			async () => {
-				const response = await axios.request({
-					httpsAgent,
-					method: 'POST',
-					url,
-					data: obj,
-					headers: {
-						'Content-Type': 'application/json',
-						'Origin': 'https://h5.tu.qq.com',
-						'Referer': 'https://h5.tu.qq.com/',
-						'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
-						'x-sign-value': sign,
-						'x-sign-version': 'v1',
-					},
-					timeout: 30000,
-				});
-				const data = checkResponse(response?.data as Record<string, unknown> | undefined);
-				return data;
-			}, {
-				onRetry(e, attempt) {
-					console.error(`QQ file upload error caught (attempt #${attempt}): ${e.toString()}`);
-				},
-				retries: 10,
-				factor: 1,
-			});
-	} catch (e) {
-		console.error(`QQ file upload error caught: ${(e as Error).toString()}`);
-		throw new Error(`Unable to upload the photo: ${(e as Error).toString()}`);
-	}
-	return data as Record<string, unknown> & { extra: string };
-};
-
-const download = async (url: string): Promise<Buffer> => {
-	let data;
-	try {
-		data = await asyncRetry(
-			async () => {
-				const response = await axios.request({
-					url,
-					timeout: 10000,
-					responseType: 'arraybuffer',
-					httpsAgent,
-				});
-
-				if (!response.data) {
-					throw new Error('No data');
-				}
-
-				return response.data;
-			},
-			{
-				onRetry(e, attempt) {
-					console.error(`QQ file download error caught (attempt #${attempt}): ${e.toString()}`);
-				},
-				retries: 10,
-				factor: 1,
-			},
-		);
-	} catch (e) {
-		console.error(`QQ file download error caught: ${(e as Error).toString()}`);
-		throw new Error(`Unable to download media: ${(e as Error).toString()}`);
-	}
-	return data;
-};
-
-const transformImage = async (args: ITransformArguments) => {
+(async () => {
+	let httpsAgent: HttpsProxyAgent<string> | SocksProxyAgent | undefined;
 	const imagePath = args.image;
 	const outputImagePath = args.output;
 	const proxy = args.proxy;
+	const mode = args.mode || 'DIFFERENT_DIMENSION_ME';
 	try {
 		if (proxy) {
-			httpsAgent = new HttpsProxyAgent(proxy);
+			if (/^socks5/.test(proxy)) {
+				httpsAgent = new SocksProxyAgent(proxy);
+			} else {
+				httpsAgent = new HttpsProxyAgent(proxy);
+			}
 		}
-		const promise = fs.readFile(path.join(imagePath));
-		Promise.resolve(promise).then(async function(buffer) {
-			const obj = makeObject(buffer);
-			const data = await sendRequest(obj);
-			const extra = JSON.parse(data.extra);
-			const imgData = await download(extra.img_urls[1] as string);
-			fs.writeFile(path.join(outputImagePath), imgData);
-			console.log(`Successfully downloaded transformed image to:\n${outputImagePath}`);
-		});
+		const buffer = await fs.readFile(imagePath);
+		let data;
+		try {
+			const obj = await makeObject(buffer, mode);
+			data = await qq.sendRequest(obj, mode, httpsAgent);
+		} catch (e) {
+			const error = (e as Error).toString().replace("Error: ", "");
+			if (error == 'Error: Face not found. Try another photo.') {
+				console.log('Face not found. Trying face hack...');
+				const obj = await makeObject(await fh.faceHack(buffer), mode);
+				data = await qq.sendRequest(obj, mode, httpsAgent);
+			} else {
+				throw new Error(error);
+			}
+		}
+		const extra = JSON.parse(data.extra);
+		const imgData = await qq.download(extra.img_urls[1] as string, httpsAgent);
+		await fs.writeFile(path.join(outputImagePath), imgData);
+		console.log(`Successfully downloaded transformed image to:\n${outputImagePath}`);
 	} catch (e) {
-		console.error(`Some error occured: ${(e as Error).toString()}`)
+		console.error(`${(e as Error).toString()}`)
 	}
-};
-
-transformImage(args);
+})();

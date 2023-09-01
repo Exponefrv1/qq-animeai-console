@@ -1,6 +1,5 @@
 # qq-animeai-console
-Lite console application for making requests to QQ anime ai.  
-There is no face hack for now.   
+Lite console application for making requests to QQ anime ai.     
 Example result:  
 
 ![Example](https://i.imgur.com/cXJaTq2.jpeg)
@@ -17,4 +16,4 @@ Usage example:
 ### ⚠️ Currently the Chinese server might throw 403 errors with DIFFERENT_DIMENSION_ME mode, note that it's default mode!
 
 ## Credits
-Original code of requests - https://github.com/lmcsu/qq-neural-anime-tg
+https://github.com/lmcsu/qq-neural-anime-tg

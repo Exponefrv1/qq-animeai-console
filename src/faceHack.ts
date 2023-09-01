@@ -8,9 +8,6 @@ module.exports = {
         let faceHackBuffer = await sharp(__dirname + '/face_hack/face_hack.jpg')
                             .resize(FACE_HACK_SIZE, FACE_HACK_SIZE)
                             .toBuffer();
-                            // .then((resolve, rejectbuffer) => {
-                            //     buffer;
-                            // });
 
         const sourceImg = sharp(sourceImgBuffer);
         const sourceImgMeta = await sourceImg.metadata();

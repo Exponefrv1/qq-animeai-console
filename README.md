@@ -1,3 +1,4 @@
+# ! AI is dead. !
 # qq-animeai-console
 Lite console application for making requests to QQ anime ai.     
 Example result:  
